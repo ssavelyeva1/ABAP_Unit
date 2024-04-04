@@ -1,0 +1,55 @@
+FUNCTION zcalculate_discounted_airfare.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     REFERENCE(FULL_FARE) TYPE  S_PRICE
+*"     REFERENCE(DISCOUNT) TYPE  S_DISCOUNT
+*"  EXPORTING
+*"     REFERENCE(DISCOUNT_FARE) TYPE  S_PRICE
+*"  EXCEPTIONS
+*"      INVALID_DISCOUNT
+*"----------------------------------------------------------------------
+  CONSTANTS: highest_discount_percentage TYPE int4 VALUE 100.
+  DATA: discount_multiplier TYPE p DECIMALS 3.
+
+  IF discount GT highest_discount_percentage.
+    RAISE invalid_discount.
+  ENDIF.
+
+  discount_multiplier = ( 100 - discount ) / 100.
+  discount_fare = full_fare * discount_multiplier.
+
+ENDFUNCTION.
+
+*======================================================================
+*
+* ABAP  Unit  Test  components
+*
+*======================================================================
+CLASS tester DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+  PRIVATE SECTION.
+    METHODS: calculate_discounted_airfare FOR TESTING.
+ENDCLASS.
+
+CLASS tester IMPLEMENTATION.
+  METHOD calculate_discounted_airfare.
+    "given
+    CONSTANTS: discount TYPE s_discount VALUE '50'.
+    DATA: flight_price     TYPE s_price VALUE '123.45',
+          discounted_price TYPE s_price.
+    "when
+    CALL FUNCTION 'ZCALCULATE_DISCOUNTED_AIRFARE'
+      EXPORTING
+        full_fare     = flight_price
+        discount      = discount
+      IMPORTING
+        discount_fare = discounted_price
+      EXCEPTIONS
+        OTHERS        = 0.
+    cl_abap_unit_assert=>assert_equals(
+      act = discounted_price
+      exp = ROUND( val = ( flight_price * ( ( 100 - discount ) / 100 ) ) dec = 2 )
+      msg = 'Discounted airfare is incorrect'
+    ).
+  ENDMETHOD.
+ENDCLASS.
