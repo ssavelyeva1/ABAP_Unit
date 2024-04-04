@@ -1,0 +1,89 @@
+  METHOD get_yrs_of_srvc.
+    IF iv_dateofhire_custom GT sy-datum.
+      MESSAGE e003(zdemo_messages) INTO ev_msgtext.
+    ELSE.
+      ev_yrs_srvc = ( sy-datum - iv_dateofhire_custom ) / 365.
+      ev_yrs_srvc = round( val = ev_yrs_srvc dec = 1 ).
+    ENDIF.
+  ENDMETHOD.
+
+*======================================================================
+*
+* ABAP  Unit  Test  components
+*
+*======================================================================
+
+CLASS ltc_as_unit_exmpl DEFINITION FOR TESTING DURATION SHORT
+                                               RISK LEVEL HARMLESS.
+  PUBLIC SECTION.
+    METHODS _01_get_yrs_of_srvc_success FOR TESTING.
+    METHODS _02_get_yrs_of_srvc_fail FOR TESTING.
+
+  PRIVATE SECTION.
+    CLASS-METHODS: class_setup.
+    CLASS-METHODS: class_teardown.
+
+    METHODS setup.
+    METHODS teardown.
+
+    DATA: mo_cut TYPE REF TO zcl_as_unit_exmpl.  "class under test
+
+ENDCLASS.
+
+CLASS ltc_as_unit_exmpl IMPLEMENTATION.
+
+  METHOD class_setup.
+  ENDMETHOD.
+
+  METHOD setup.
+    mo_cut = NEW #( ). "instantiating the class under test
+  ENDMETHOD.
+
+  METHOD teardown.
+    CLEAR mo_cut. "clearing it's instance
+  ENDMETHOD.
+
+  METHOD class_teardown.
+  ENDMETHOD.
+
+  METHOD _01_get_yrs_of_srvc_success.
+    "given
+    DATA: lv_dateofhire TYPE d VALUE '20000101',
+          lv_yrs_srvc   TYPE dec10_2,
+          lv_msgtext    TYPE string.
+    "when
+    mo_cut->get_yrs_of_srvc(
+      EXPORTING
+        iv_dateofhire_custom = lv_dateofhire
+      IMPORTING
+        ev_yrs_srvc = lv_yrs_srvc
+        ev_msgtext = lv_msgtext
+    ).
+    "then
+    cl_abap_unit_assert=>assert_equals(
+        act = lv_yrs_srvc
+        exp = round( val = ( sy-datum - lv_dateofhire ) / 365 dec = 1 )
+    ).
+  ENDMETHOD.
+
+  METHOD _02_get_yrs_of_srvc_fail.
+    "given
+    DATA: lv_dateofhire TYPE d VALUE '20250624',
+          lv_yrs_srvc   TYPE dec10_2,
+          lv_msgtext    TYPE string.
+    "when
+    mo_cut->get_yrs_of_srvc(
+      EXPORTING
+        iv_dateofhire_custom = lv_dateofhire
+      IMPORTING
+        ev_yrs_srvc = lv_yrs_srvc
+        ev_msgtext = lv_msgtext
+    ).
+    "then
+    cl_abap_unit_assert=>assert_equals(
+        act = lv_msgtext
+        exp = 'Date of hire cannot be a future date. Please enter a valid hire date.'
+    ).
+  ENDMETHOD.
+
+ENDCLASS.
