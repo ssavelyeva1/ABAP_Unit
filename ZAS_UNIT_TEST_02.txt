@@ -1,0 +1,46 @@
+*&---------------------------------------------------------------------*
+*& Report ZAS_UNIT_TEST_02
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zas_unit_test_02.
+
+PARAMETERS: addend01 TYPE int4,
+            addend02 TYPE int4.
+DATA: sum TYPE int4.
+
+START-OF-SELECTION.
+  PERFORM get_sum USING addend01
+                        addend02
+                  CHANGING sum.
+  MESSAGE i000(0k) WITH 'Sum is' sum.
+
+  FORM get_sum USING addend_01 TYPE int4
+                     addend_02 TYPE int4
+               CHANGING sum TYPE int4.
+    sum = addend_01 + addend_02.
+  ENDFORM.
+
+CLASS some_test_class DEFINITION FOR TESTING RISK LEVEL HARMLESS.
+  PRIVATE SECTION.
+    METHODS test_for_get_sum FOR TESTING.
+ENDCLASS.
+
+CLASS some_test_class IMPLEMENTATION.
+  METHOD test_for_get_sum.
+    CONSTANTS addend_01 TYPE i VALUE 17.
+    CONSTANTS addend_02 TYPE i VALUE 30.
+    DATA: sum          TYPE i,
+          expected_sum TYPE i.
+
+    PERFORM get_sum USING addend_01
+                          addend_02
+                    CHANGING sum.
+    expected_sum = addend_01 + addend_02.
+    CALL METHOD cl_abap_unit_assert=>assert_equals
+      EXPORTING
+        act = sum
+        exp = expected_sum
+        msg = 'Unexpected sum'.
+  ENDMETHOD.
+ENDCLASS.
