@@ -1,0 +1,296 @@
+*&---------------------------------------------------------------------*
+*& Report ZAS_UNIT_TEST_03
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zas_unit_test_03.
+
+TYPES: BEGIN OF ty_purdoc_hdr,
+         ebeln TYPE ebeln,
+         bukrs TYPE bukrs,
+         bstyp TYPE bstyp,
+         bsart TYPE bsart,
+         statu TYPE statu,
+         aedat TYPE aedat,
+         ernam TYPE ernam,
+         lifnr TYPE lifnr,
+         waers TYPE waers,
+       END OF ty_purdoc_hdr,
+
+       BEGIN OF ty_purdoc_itm,
+         ebeln TYPE ebeln,
+         ebelp TYPE ebelp,
+         matnr TYPE matnr,
+         menge TYPE bstmg,
+         meins TYPE bstme,
+         netwr TYPE bwert,
+         brtwr TYPE bbwert,
+       END OF ty_purdoc_itm.
+
+DATA: lt_purdoc_hdr TYPE TABLE OF ty_purdoc_hdr,
+      ls_purdoc_hdr TYPE ty_purdoc_hdr,
+      lt_purdoc_itm TYPE TABLE OF ty_purdoc_itm.
+
+DATA: lo_alv TYPE REF TO cl_salv_table,
+      lv_msg TYPE string.
+
+PARAMETERS: p_ebeln TYPE ebeln,
+            p_hdr   RADIOBUTTON GROUP g1,
+            p_itm   RADIOBUTTON GROUP g1.
+
+PERFORM disp_purdoc_alv USING p_ebeln p_hdr p_itm.
+
+FORM disp_purdoc_alv USING iv_ebeln iv_hdr iv_itm.
+
+  SELECT SINGLE ebeln bukrs bstyp bsart statu aedat ernam lifnr waers
+    FROM ekko INTO CORRESPONDING FIELDS OF ls_purdoc_hdr
+    WHERE ebeln EQ iv_ebeln.
+
+  IF sy-subrc EQ 0.
+    "if there is data found in header table, procees with item table
+    APPEND ls_purdoc_hdr TO lt_purdoc_hdr.
+
+    SELECT ebeln ebelp matnr menge meins netwr brtwr
+      FROM ekpo INTO CORRESPONDING FIELDS OF TABLE lt_purdoc_itm
+      WHERE ebeln EQ iv_ebeln.
+
+    IF sy-subrc EQ 0.
+      "if data found in item table
+
+      IF iv_hdr EQ abap_true AND lo_alv IS NOT BOUND.
+        "display header data, proceed with ALV display
+        "if it's not yet instantiated
+        CALL METHOD cl_salv_table=>factory
+          EXPORTING
+            list_display = if_salv_c_bool_sap=>false
+          IMPORTING
+            r_salv_table = lo_alv
+          CHANGING
+            t_table      = lt_purdoc_hdr.
+        lo_alv->display( ).
+
+      ELSEIF iv_itm EQ abap_true AND lo_alv IS NOT BOUND.
+        "display item data, proceed with ALV display
+        "if it's not yet instantiated
+        CALL METHOD cl_salv_table=>factory
+          EXPORTING
+            list_display = if_salv_c_bool_sap=>false
+          IMPORTING
+            r_salv_table = lo_alv
+          CHANGING
+            t_table      = lt_purdoc_itm.
+        lo_alv->display( ).
+
+      ENDIF.
+
+    ELSE.
+      "if data is not found in item table, throw an error message.
+      MESSAGE e001(zdemo_messages) INTO lv_msg WITH p_ebeln.
+    ENDIF.
+
+  ELSE.
+    "if data not found in header table, throw an error message.
+    MESSAGE E000(zdemo_messages) INTO lv_msg WITH p_ebeln.
+  ENDIF.
+
+ENDFORM.
+
+
+*&---------------------------------------------------------------------*
+*& Unit tests
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+CLASS ltc_zas_unit_test_03 DEFINITION FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+
+  PRIVATE SECTION.
+
+    "Data definition for the test environment to redirect the access
+    "from the actual database tables EKKO and EKPO, to their respective test doubles.
+    CLASS-DATA: environment TYPE REF TO if_osql_test_environment.
+    CLASS-METHODS: class_setup.
+    CLASS-METHODS: class_teardown.
+
+    METHODS: setup.
+    METHODS: teardown.
+
+    "unit test methods (private)
+    METHODS _01_disp_hdr_alv_pass FOR TESTING.   "header data is displayed to the user
+    METHODS _02_disp_itm_alv_pass FOR TESTING.   "item data is displayed to the user
+    METHODS _03_disp_hdr_alv_fail_no_data FOR TESTING.   "there is no header data to be displayed to the user
+    METHODS _04_disp_itm_alv_fail_no_data FOR TESTING.   "there is no item data to be displayed to the user
+
+    "internal tables of the type of dependent-on-components database tables.
+    "test data will be loaded into these internal tables in setup() method during class implementation.
+    DATA: mt_ekko TYPE STANDARD TABLE OF ekko,
+          mt_ekpo TYPE STANDARD TABLE OF ekpo.
+
+ENDCLASS.
+
+CLASS ltc_zas_unit_test_03 IMPLEMENTATION.
+
+  METHOD class_setup.
+
+    "need to mock the invocation to the output functionality (ALV)
+    environment = cl_osql_test_environment=>create( i_dependency_list = VALUE #( ( 'EKKO' ) ( 'EKPO' ) ) ).
+
+    "defining object mo_alv_mock of the same type as lo_alv (i.e. cl_salv_table)
+    DATA: mo_alv_mock TYPE REF TO cl_salv_table.
+
+    "instantiating the object after definition
+    CALL METHOD cl_salv_table=>factory
+      IMPORTING
+        r_salv_table = mo_alv_mock
+      CHANGING
+        t_table      = lt_purdoc_hdr.
+
+    "injecting the mock object to the actual object.
+    lo_alv = mo_alv_mock.
+
+  ENDMETHOD.
+
+  METHOD setup.
+
+    "defining the test data (dummy data) for the test doubles
+    mt_ekko = VALUE #(
+                        ( ebeln = '6000000000' bukrs = '3100' bstyp = 'F' bsart = 'ZIC' statu = '9' aedat = '15.08.2023' ernam = 'Y0AAAA000' lifnr = 'IN19470528' waers = 'EUR' )
+                        ( ebeln = '6000000001' bukrs = '3340' bstyp = 'F' bsart = 'ZIC' statu = '9' aedat = '20.07.2023' ernam = 'Y0AAAA001' lifnr = 'IN19470529' waers = 'USD' )
+                        ( ebeln = '6000000002' bukrs = '3120' bstyp = 'F' bsart = 'ZIC' statu = '9' aedat = '03.06.2023' ernam = 'Y0AAAA002' lifnr = 'IN19470527' waers = 'EUR' )
+                     ).
+
+    mt_ekpo = VALUE #(
+                        ( ebeln = '6000000000' ebelp = '00010' matnr = '69IC929' menge = '1000' meins = 'LE' netwr = '1000' brtwr = '1000' )
+                        ( ebeln = '6000000000' ebelp = '00020' matnr = '69IC930' menge = '1000' meins = 'LE' netwr = '100' brtwr = '100' )
+                        ( ebeln = '6000000000' ebelp = '00030' matnr = '69IC931' menge = '1000' meins = 'LE' netwr = '100' brtwr = '100' )
+                        ( ebeln = '6000000001' ebelp = '00010' matnr = '69IC929' menge = '1000' meins = 'LE' netwr = '1000' brtwr = '1000' )
+                        ( ebeln = '6000000001' ebelp = '00020' matnr = '69IC930' menge = '1000' meins = 'LE' netwr = '1000' brtwr = '1000' )
+                    ).
+
+    "inserting the test data in the test doubles
+    environment->insert_test_data( mt_ekko ).
+    environment->insert_test_data( mt_ekpo ).
+
+  ENDMETHOD.
+
+  METHOD _01_disp_hdr_alv_pass.
+    "given
+    "declaring a local internal table for the expected value to be asserted with the actual value
+    DATA: lt_purdoc_hdr_exp TYPE TABLE OF ty_purdoc_hdr. "for expected value
+
+    lt_purdoc_hdr_exp = VALUE #(
+                                ( ebeln = '6000000000' bukrs = '3100' bstyp = 'F' bsart = 'ZIC' statu = '9' aedat = '15.08.2023' ernam = 'Y0AAAA000' lifnr = 'IN19470528' waers = 'EUR' )
+                              ).
+
+    "input data for this test case
+    p_ebeln = '6000000000'.
+    p_hdr = abap_true.
+    p_itm = abap_false.
+
+    "when
+    "calling the subroutine with these input parameters
+    PERFORM disp_purdoc_alv USING p_ebeln p_hdr p_itm.
+
+    "then
+    "positive test case - header data is displayed, no error msg is thrown
+    cl_abap_unit_assert=>assert_equals(
+      EXPORTING
+        act = lt_purdoc_hdr
+        exp = lt_purdoc_hdr_exp ).
+
+    cl_abap_unit_assert=>assert_initial( lv_msg ).
+
+  ENDMETHOD.
+
+  METHOD _02_disp_itm_alv_pass.
+    "given
+    "declaring a local internal table for the expected value to be asserted with the actual value
+    DATA: lt_purdoc_itm_exp TYPE TABLE OF ty_purdoc_itm.
+
+    lt_purdoc_itm_exp = VALUE #(
+                                ( ebeln = '6000000000' ebelp = '00010' matnr = '69IC929' menge = '1000' meins = 'LE' netwr = '1000' brtwr = '1000' )
+                                ( ebeln = '6000000000' ebelp = '00020' matnr = '69IC930' menge = '1000' meins = 'LE' netwr = '100' brtwr = '100' )
+                                ( ebeln = '6000000000' ebelp = '00030' matnr = '69IC931' menge = '1000' meins = 'LE' netwr = '100' brtwr = '100' )
+                              ).
+
+    "input data for this test case
+    p_ebeln = '6000000000'.
+    p_hdr = abap_false.
+    p_itm = abap_true.
+
+    "when
+    "calling the subroutine with these input parameters
+    PERFORM disp_purdoc_alv USING p_ebeln p_hdr p_itm.
+
+    "then
+    "positive test case - item data is displayed, no error msg is thrown
+    cl_abap_unit_assert=>assert_equals(
+      EXPORTING
+        act = lt_purdoc_itm
+        exp = lt_purdoc_itm_exp ).
+
+    cl_abap_unit_assert=>assert_initial( lv_msg ).
+
+  ENDMETHOD.
+
+  METHOD _03_disp_hdr_alv_fail_no_data.
+    "given
+    DATA: lv_msg_exp TYPE string VALUE 'Purchasing Document 8000000000 not found'.
+
+    "input data for this test case
+    p_ebeln = '8000000000'.
+    p_hdr = abap_true.
+    p_itm = abap_false.
+
+    "when
+    PERFORM disp_purdoc_alv USING p_ebeln p_hdr p_itm.
+
+    "then
+    "negative test case - header data is not displayed, error msg is thrown
+    cl_abap_unit_assert=>assert_equals(
+      EXPORTING
+        act = lv_msg
+        exp = lv_msg_exp ).
+
+    cl_abap_unit_assert=>assert_initial( lt_purdoc_hdr ).
+
+  ENDMETHOD.
+
+  METHOD _04_disp_itm_alv_fail_no_data.
+    "given
+    DATA: lv_msg_exp TYPE string VALUE 'No items found for Purchasing Order 6000000002'.
+
+    "input data for this test case
+    p_ebeln = '6000000002'.
+    p_hdr = abap_true.
+    p_itm = abap_false.
+
+    "when
+    PERFORM disp_purdoc_alv USING p_ebeln p_hdr p_itm.
+
+    "then
+    "negative test case - header data is not displayed, error msg is thrown
+    cl_abap_unit_assert=>assert_equals(
+      EXPORTING
+        act = lv_msg
+        exp = lv_msg_exp ).
+
+    cl_abap_unit_assert=>assert_initial( lt_purdoc_itm ).
+
+  ENDMETHOD.
+
+  METHOD teardown.
+
+    CLEAR lt_purdoc_hdr.
+    CLEAR lt_purdoc_itm.
+
+    environment->clear_doubles( ).
+
+  ENDMETHOD.
+
+  METHOD class_teardown.
+
+    environment->destroy( ).
+
+  ENDMETHOD.
+
+ENDCLASS.
