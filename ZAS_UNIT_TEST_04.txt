@@ -1,0 +1,92 @@
+*&---------------------------------------------------------------------*
+*& Report ZAS_UNIT_TEST_04
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zas_unit_test_04.
+
+CONSTANTS valid_severities TYPE string VALUE 'SIWEAX'.
+DATA severity_is_valid TYPE abap_bool.
+PARAMETERS severity TYPE symsgty OBLIGATORY.
+
+AT SELECTION-SCREEN.
+  PERFORM validate_message_severity.
+  IF severity_is_valid NE abap_true.
+    MESSAGE e002(zdemo_messages) WITH valid_severities.
+  ENDIF.
+
+START-OF-SELECTION.
+  MESSAGE 'Hello World!' TYPE severity.
+
+FORM validate_message_severity.
+  IF severity CA valid_severities.
+    severity_is_valid = abap_true.
+  ELSE.
+    severity_is_valid = abap_false.
+  ENDIF.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Unit test
+*&---------------------------------------------------------------------*
+
+CLASS ltc_unit_tester DEFINITION FOR TESTING RISK LEVEL HARMLESS.
+  PRIVATE SECTION.
+    METHODS: validate_valid_severities FOR TESTING.
+    METHODS: validate_invalid_severities FOR TESTING.
+ENDCLASS.
+
+CLASS ltc_unit_tester IMPLEMENTATION.
+  "test method to validate only one input parameter - 'S'
+*  METHOD validate_message_severity_s.
+*    severity = 'S'.
+*    PERFORM validate_message_severity.
+*    CALL METHOD cl_abap_unit_assert=>assert_equals
+*      EXPORTING
+*        act = severity_is_valid
+*        exp = abap_true
+*        msg = 'Unexpected result for severity S'.
+*  ENDMETHOD.
+
+  "test method to validate six input parameters - 'SIWEAX'
+  "method iterated through all of the valid severity values and
+  "checks that subroutine returns abap_true for each one of them
+  METHOD validate_valid_severities.
+    DATA: valid_severity_values TYPE c LENGTH 06,
+          failure_message       TYPE string.
+    valid_severity_values = valid_severities.
+
+    WHILE valid_severity_values IS NOT INITIAL.
+      severity = valid_severity_values.
+      PERFORM validate_message_severity.
+      CONCATENATE 'Unexpected result for severity' severity
+        INTO failure_message SEPARATED BY space.
+      CALL METHOD cl_abap_unit_assert=>assert_equals
+        EXPORTING
+          act = severity_is_valid
+          exp = abap_true
+          msg = failure_message.
+      SHIFT valid_severity_values LEFT BY 01 PLACES.
+    ENDWHILE.
+  ENDMETHOD.
+
+  "test method to validate six invalid input parameters - '123456'
+  METHOD validate_invalid_severities.
+    DATA: invalid_severity_values TYPE c LENGTH 06 VALUE '123456',
+          failure_message         TYPE string.
+
+    WHILE invalid_severity_values IS NOT INITIAL.
+      severity = invalid_severity_values.
+      PERFORM validate_message_severity.
+      CONCATENATE 'Unexpected result for severity' severity
+        INTO failure_message SEPARATED BY space.
+      CALL METHOD cl_abap_unit_assert=>assert_equals
+        EXPORTING
+          act = severity_is_valid
+          exp = abap_false
+          msg = failure_message.
+      SHIFT invalid_severity_values LEFT BY 01 PLACES.
+    ENDWHILE.
+  ENDMETHOD.
+
+ENDCLASS.
